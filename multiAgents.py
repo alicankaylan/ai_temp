@@ -286,9 +286,54 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
             alpha = max(max_value, alpha)
         return max_action
 
+    def get_action_value(self, gameState, agent_index, turn_depth, alpha, beta):
+        max_game_depth = self.depth
+        is_win = gameState.isWin()
+        is_lose = gameState.isLose()
+        evaluation_func = self.evaluationFunction
 
-    def get_action_value(self, new_game_state, agent_index, turn_depth, alpha, beta):
-        return 0
+        if is_win or is_lose or turn_depth >= max_game_depth:
+            return evaluation_func(gameState)
+        elif agent_index == 0:
+            return self.get_value_for_max_agent(gameState, agent_index, turn_depth, alpha, beta)
+        else:
+            return self.get_value_for_min_agent(gameState, agent_index, turn_depth, alpha, beta)
+
+    def get_value_for_max_agent(self, gameState, agent_index, turn_depth, alpha, beta):
+        next_move_values = float("-inf")
+
+        legal_action_list = gameState.getLegalActions(agent_index)
+        for legal_action in legal_action_list:
+            new_game_state = gameState.generateSuccessor(agent_index, legal_action)
+            new_action_value = self.get_action_value(new_game_state, agent_index=agent_index + 1, turn_depth=turn_depth
+                                                     , alpha=alpha, beta=beta)
+            next_move_values = max(next_move_values, new_action_value)
+            if next_move_values > beta:
+                return next_move_values
+            alpha = max(next_move_values, alpha)
+        return next_move_values
+
+    def get_value_for_min_agent(self, gameState, agent_index, turn_depth, alpha, beta):
+        next_move_values = float("inf")
+        last_agent_index = gameState.getNumAgents() - 1
+        legal_action_list = gameState.getLegalActions(agent_index)
+        for legal_action in legal_action_list:
+            new_game_state = gameState.generateSuccessor(agent_index, legal_action)
+
+            if agent_index == last_agent_index:
+                new_action_value = self.get_action_value(new_game_state, agent_index=0,
+                                                         turn_depth=turn_depth+1, alpha=alpha, beta=beta)
+            else:
+                new_action_value = self.get_action_value(new_game_state, agent_index=agent_index + 1,
+                                                         turn_depth=turn_depth, alpha=alpha, beta=beta)
+            next_move_values = min(next_move_values, new_action_value)
+
+            if next_move_values < alpha:
+                return next_move_values
+
+            beta = min(next_move_values, beta)
+        return next_move_values
+
 
 
 class ExpectimaxAgent(MultiAgentSearchAgent):
@@ -304,7 +349,65 @@ class ExpectimaxAgent(MultiAgentSearchAgent):
         legal moves.
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        #util.raiseNotDefined()
+        agent_index = 0
+        turn_depth = 0
+
+        max_action = None
+        max_value = float("-inf")
+
+        legal_action_list = gameState.getLegalActions(0)
+        for legal_action in legal_action_list:
+            new_game_state = gameState.generateSuccessor(agent_index, legal_action)
+            new_action_value = self.get_action_value(new_game_state, agent_index=agent_index + 1, turn_depth=turn_depth)
+
+            if max_action is None or max_value is None or max_value < new_action_value:
+                max_action = legal_action
+                max_value = new_action_value
+
+        return max_action
+
+    def get_action_value(self, gameState, agent_index, turn_depth):
+        max_game_depth = self.depth
+        is_win = gameState.isWin()
+        is_lose = gameState.isLose()
+        evaluation_func = self.evaluationFunction
+
+        if is_win or is_lose or turn_depth >= max_game_depth:
+            return evaluation_func(gameState)
+        elif agent_index == 0:
+            return self.get_value_for_max_agent(gameState, agent_index, turn_depth)
+        else:
+            return self.get_value_for_min_agent(gameState, agent_index, turn_depth)
+
+
+    def get_value_for_max_agent(self, gameState, agent_index, turn_depth):
+        next_move_values = float("-inf")
+
+        legal_action_list = gameState.getLegalActions(agent_index)
+        for legal_action in legal_action_list:
+            new_game_state = gameState.generateSuccessor(agent_index, legal_action)
+            new_action_value = self.get_action_value(new_game_state, agent_index=agent_index + 1, turn_depth=turn_depth)
+            next_move_values = max(next_move_values, new_action_value)
+
+        return next_move_values
+
+    def get_value_for_min_agent(self, gameState, agent_index, turn_depth):
+        next_move_values = 0
+        last_agent_index = gameState.getNumAgents() - 1
+        legal_action_list = gameState.getLegalActions(agent_index)
+        for legal_action in legal_action_list:
+            new_game_state = gameState.generateSuccessor(agent_index, legal_action)
+
+            if agent_index == last_agent_index:
+                new_action_value = self.get_action_value(new_game_state, agent_index=0,
+                                                         turn_depth=turn_depth + 1)
+            else:
+                new_action_value = self.get_action_value(new_game_state, agent_index=agent_index + 1,
+                                                         turn_depth=turn_depth)
+            next_move_values = next_move_values + new_action_value
+        return next_move_values
+
 
 def betterEvaluationFunction(currentGameState):
     """
@@ -314,7 +417,29 @@ def betterEvaluationFunction(currentGameState):
     DESCRIPTION: <write something here so we know what you did>
     """
     "*** YOUR CODE HERE ***"
-    util.raiseNotDefined()
+    #util.raiseNotDefined()
+    score = scoreEvaluationFunction(currentGameState)
+    newPos = currentGameState.getPacmanPosition()
+    newFood = currentGameState.getFood()
+    newGhostStates = currentGameState.getGhostStates()
+
+    newFoodList = newFood.asList()
+    newFoodDistance = [manhattanDistance(f, newPos) for f in newFoodList]
+    minFoodDist = min(newFoodDistance, default=0.001) if min(newFoodDistance, default=0.001) > 0 else 0.0001
+    countFood = len(newFoodList) if len(newFoodList) > 0 else 0.001
+
+    newGhostPositions = [g.getPosition() for g in newGhostStates]
+    newGhostDistances = [manhattanDistance(g, newPos) for g in newGhostPositions]
+    minGhostDist = min(newGhostDistances, default=0.001) if min(newGhostDistances, default=0.001) <= 4 else 4
+
+    capsuleList = currentGameState.getCapsules()
+    capsuledDistance = [manhattanDistance(f, newPos) for f in capsuleList]
+    minCapsuledDistance = min(capsuledDistance, default=0.001) if min(capsuledDistance, default=0.001) > 0 else 1
+    counCapsule = len(capsuleList) if len(capsuleList) > 0 else 0.001
+
+    score = 1 / (countFood + counCapsule) + minGhostDist - 0.000001 * minFoodDist - 0.00000003 * minCapsuledDistance + score
+
+    return score
 
 # Abbreviation
 better = betterEvaluationFunction
